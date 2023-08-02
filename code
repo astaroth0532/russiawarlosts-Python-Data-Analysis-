@@ -1,0 +1,251 @@
+#імпорт базових бібліотек для роботи
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import os
+for dirname, _, filenames in os.walk('/kaggle/input'):
+    for filename in filenames:
+        print(os.path.join(dirname, filename))
+
+import warnings
+warnings.filterwarnings('ignore')
+plt.style.use('tableau-colorblind10')
+
+#читання із csv-файлів
+equipment_dataset = pd.read_csv("russia_losses_equipment.csv")
+print(equipment_dataset)
+print(equipment_dataset.dtypes)
+
+personnel_dataset = pd.read_csv("russia_losses_personnel.csv")
+print(personnel_dataset)
+print(personnel_dataset.dtypes)
+
+#відображення базової інформації
+print(f"Shape of The Equipment Dataset : {equipment_dataset.shape}")
+print(equipment_dataset.info())
+equipment_dataset.head().style.set_properties(**{"background-color": "#bc4749","color":"#e9c46a","border": "1.5px solid black"})
+
+print(f"Shape of The Personnel Dataset : {personnel_dataset.shape}")
+print(personnel_dataset.info())
+personnel_dataset.head().style.set_properties(**{"background-color": "#bc4749","color":"#e9c46a","border": "1.5px solid black"})
+
+# прибирання з датасетів пустих полів
+equipment_dataset.rename(columns={col:col.replace(' ', '') for col in equipment_dataset.columns}, inplace=True)
+equipment_dataset.head()
+personnel_dataset.rename(columns={col:col.replace(' ', '') for col in personnel_dataset.columns}, inplace=True)
+personnel_dataset.head()
+
+#злиття двох датасетів у один
+equipment_dataset[["personnel","POW"]] = personnel_dataset[["personnel","POW"]]
+equipment_dataset.head().style.set_properties(**{"background-color": "#bc4749","color":"#e9c46a","border": "1.5px solid black"})
+
+equipment_dataset.describe().style.set_properties(**{"background-color": "#bc4749","color":"#e9c46a","border": "1.5px solid black"})
+equipment_dataset.describe(include=object).T.style.set_properties(**{"background-color": "#bc4749","color":"#e9c46a","border": "1.5px solid black"})
+print(f"Загальний вигляд єдиного датасету :")
+print(equipment_dataset)
+
+sns.set_style("white")
+sns.set(rc={"axes.facecolor":"#f2e2ba","figure.facecolor":"#f2e2ba"})
+sns.set_context("poster",font_scale = .7)
+palette = ["#5f0f40","#9a031e","#fb8b24","#7C7C7C","#e36414","#0f4c5c","#FFC300"]
+palette_ex = ["#071e22","#1d7874","#679289","#f4c095","#ee2e31","#ffb563","#918450","#f85e00","#a41623","#9a031e","#d6d6d6","#ffee32","#333533","#ffd100","#202020","#B7094C"]
+pal = ["#f94144","#f3722c","#f8961e","#f9844a","#f9c74f","#90be6d","#43aa8b","#4d908e","#577590","#277da1"]
+"""
+sns.palplot(sns.color_palette(palette))
+sns.palplot(sns.color_palette(palette_ex))
+sns.palplot(sns.color_palette(pal))"""
+
+#об'єднуємо поля "military auto" та"fuel tank" та прибираємо поле "date" у новому вигляді датасету та виводимо результат на екран
+war_data = equipment_dataset[:]
+war_data["vehiclesandfueltanks"] = war_data[["militaryauto","fueltank","vehiclesandfueltanks"]].sum(axis=1)
+war_data.drop(columns=["date","militaryauto","fueltank"],inplace=True)
+war_data.head(10).style.set_properties(**{"background-color": "#bc4749","color":"#e9c46a","border": "1.5px solid black"})
+#print(war_data)
+"""
+Ми бачимо, що всі значення набору даних записуються у форматі кумулятивної суми по стовпцях.
+Давайте створимо новий набір даних під назвою **"person_data"** і переформатуємо дані у форматі щоденних записів.
+"""
+#створюємо новий набір даних під назвою "person_data" і переформатуємо дані у форматі щоденних записів.
+person_data = war_data[["day","personnel","POW"]]
+person_data[["personnel","POW"]] = person_data[["personnel","POW"]].diff().fillna(person_data[["personnel","POW"]])
+person_data.set_index("day", drop=True, inplace=True)
+
+person_data.head(20).astype(int).T.style.set_properties(**{"background-color": "#bc4749","color":"#e9c46a","border": "1.5px solid black"})
+print(person_data)
+
+print(f'Загальна кількість ліквідованих окупантів : {person_data["personnel"].sum().astype(int)}')
+print(f'Загальна кількість полонених : {person_data["POW"].sum().astype(int)}')
+
+#діаграма, що показує долю загарбників
+plt.subplots(figsize=(12, 12))
+
+labels = "Ліквідовані","Полонені"
+size = 0.5
+
+wedges, texts, autotexts = plt.pie([person_data["personnel"].sum(),
+                                    person_data["POW"].sum()],
+                                    explode = (0,0),
+                                    textprops=dict(size= 20, color= "black"),
+                                    autopct="%.2f%%",
+                                    pctdistance = 0.75,
+                                    
+                                    colors = ["#bc4749","#FFC300"],
+                                    labels = labels, labeldistance = 1.05,
+                                    shadow = False,
+                                    wedgeprops=dict(edgecolor = "#1c1c1c", linewidth = 0.6),
+                                    startangle = 1)
+
+plt.legend(wedges, labels,loc="lower center",bbox_to_anchor=(1, 0, 0.5, 1), edgecolor = "#1c1c1c")
+plt.title("\nДоля загарбників",fontsize=20)
+plt.show()
+
+plt.subplots(figsize=(20, 8))
+p = sns.histplot(person_data["personnel"],color="#bc4749",kde=True,bins=50,alpha=1,fill=True,edgecolor=palette_ex[14])
+p.axes.lines[0].set_color(palette[6])
+p.axes.set_title("\nРозподіл кількості загиблих серед особового складу\n",fontsize=25)
+plt.ylabel("Особовий склад",fontsize=20)
+plt.xlabel("\nЧас",fontsize=20)
+sns.despine(left=True, bottom=True)
+plt.show()
+
+plt.subplots(figsize=(20, 8))
+p = sns.histplot(person_data[person_data["POW"]>0]["POW"],color="#fca311",kde=True,bins=30,alpha=1,fill=True,edgecolor=palette_ex[14])
+p.axes.lines[0].set_color("#bc4749")
+p.axes.set_title("\nРозподіл кількості полонених серед особового складу\n",fontsize=25)
+plt.ylabel("Число полонених",fontsize=20)
+plt.xlabel("Час\n",fontsize=20)
+
+sns.despine(left=True, bottom=True)
+plt.show()
+
+#cтатистика втрат у повітрі
+air_data = war_data[["day","aircraft","helicopter","drone","mobileSRBMsystem"]]
+air_data[["aircraft","helicopter","drone","mobileSRBMsystem"]] = air_data[["aircraft","helicopter","drone","mobileSRBMsystem"]].diff().fillna(air_data[["aircraft","helicopter","drone","mobileSRBMsystem"]])
+air_data.set_index("day" , drop=True, inplace =True)
+air_data.rename(columns={col:col.replace(' ', '') for col in air_data.columns}, inplace=True)
+air_data.head()
+
+print("Втрати повітряних засобів по дням :")
+air_data.head(25).T.style.set_properties(**{"background-color": "#bc4749","color":"#e9c46a","border": "1.5px solid black"})
+print(air_data)
+
+_, axs = plt.subplots(2,2,figsize=(20,10),sharex=True)
+plt.tight_layout(pad=4.0)
+
+sns.lineplot(x="day",y="aircraft",data=air_data,ax=axs[0,0],color=palette[5])
+axs[0,0].set_title("Aircraft\n",fontsize=25)
+axs[0,0].set_xlabel("Дні",fontsize=20)
+axs[0,0].set_ylabel("Кількість",fontsize=20)
+
+sns.lineplot(x="day",y="helicopter",data=air_data,ax=axs[0,1],color=palette[6])
+axs[0,1].set_title("Helicopter\n",fontsize=25)
+axs[0,1].set_xlabel("Дні",fontsize=20)
+axs[0,1].set_ylabel("Кількість",fontsize=20)
+
+sns.lineplot(x="day",y="drone",data=air_data,ax=axs[1,0],color=palette[0])
+axs[1,0].set_title("Drone\n",fontsize=25)
+axs[1,0].set_xlabel("\nДні",fontsize=20)
+axs[1,0].set_ylabel("Кількість",fontsize=20)
+
+sns.lineplot(x="day",y="mobileSRBMsystem",data=air_data[air_data["mobileSRBMsystem"]>= 0],ax=axs[1,1],color=palette[1])
+axs[1,1].set_title("Mobile SRBM System\n",fontsize=25)
+axs[1,1].set_xlabel("\nДні",fontsize=20)
+axs[1,1].set_ylabel("Кількість",fontsize=20)
+
+plt.suptitle("Втрати повітряних засобів по дням",fontsize=30, y=1.05)
+
+sns.despine(left=True, bottom=True)
+plt.show()
+
+field_data = war_data[["day","tank","APC","MRL","fieldartillery","anti-aircraftwarfare","vehiclesandfueltanks"]]
+field_data[["tank","APC","MRL","fieldartillery","anti-aircraftwarfare","vehiclesandfueltanks"]] = field_data[["tank","APC","MRL","fieldartillery","anti-aircraftwarfare","vehiclesandfueltanks"]].diff().fillna(field_data[["tank","APC","MRL","fieldartillery","anti-aircraftwarfare","vehiclesandfueltanks"]])
+field_data[field_data["vehiclesandfueltanks"] < 0]["vehiclesandfueltanks"] = 0
+field_data.set_index("day" , drop=True, inplace =True)
+
+print("Втрати сухопутної техніки по дням :")
+field_data.head(25).astype(int).T.style.set_properties(**{"background-color": "#bc4749","color":"#e9c46a","border": "1.5px solid black"})
+
+#діаграма cтатистика втрат по сухопутним військам 
+_, axs = plt.subplots(2,3,figsize=(25,12),sharex=True)
+plt.tight_layout(pad=4.0)
+
+sns.lineplot(x="day",y="tank",data=field_data,ax=axs[0,0],color=palette[5])
+axs[0,0].set_title("\nTанк\n",fontsize=25)
+axs[0,0].set_xlabel("Дні",fontsize=20)
+axs[0,0].set_ylabel("",fontsize=20)
+
+sns.lineplot(x="day",y="APC",data=field_data,ax=axs[0,1],color=palette[6])
+axs[0,1].set_title("\nБТР\n",fontsize=25)
+axs[0,1].set_xlabel("Дні",fontsize=20)
+axs[0,1].set_ylabel("",fontsize=20)
+
+sns.lineplot(x="day",y="vehiclesandfueltanks",data=field_data,ax=axs[0,2],color=palette[3])
+axs[0,2].set_title("\nВантажівки та паливо\n",fontsize=25)
+axs[0,2].set_xlabel("Дні",fontsize=20)
+axs[0,2].set_ylabel("",fontsize=20)
+
+sns.lineplot(x="day",y="MRL",data=field_data,ax=axs[1,0],color=palette[0])
+axs[1,0].set_title("\nРСЗВ\n",fontsize=25)
+axs[1,0].set_xlabel("\nДні",fontsize=20)
+axs[1,0].set_ylabel("",fontsize=20)
+
+sns.lineplot(x="day",y="anti-aircraftwarfare",data=field_data,ax=axs[1,1],color=palette[2])
+axs[1,1].set_title("\nППО\n",fontsize=25)
+axs[1,1].set_xlabel("\nДні",fontsize=20)
+axs[1,1].set_ylabel("",fontsize=20)
+
+sns.lineplot(x="day",y="fieldartillery",data=field_data,ax=axs[1,2],color=palette[1])
+axs[1,2].set_title("\nСАУ\n",fontsize=25)
+axs[1,2].set_xlabel("\nДні",fontsize=20)
+axs[1,2].set_ylabel("",fontsize=20)
+
+# plt.delaxes(axs[2,0])
+# plt.delaxes(axs[2,2])
+plt.suptitle("Втрати сухопутної техніки по дням",fontsize=30, y=1.05)
+sns.despine(left=True, bottom=True)
+plt.show()
+
+#вода
+water_data = war_data[["day","navalship","cruisemissiles"]]
+water_data[["navalship","cruisemissiles"]] = water_data[["navalship","cruisemissiles"]].diff().fillna(water_data[["navalship","cruisemissiles"]])
+water_data.set_index("day" , drop=True, inplace =True)
+
+print("Day-wise destructions of water equipments :")
+water_data.head(25).T.style.set_properties(**{"background-color": "#bc4749","color":"#e9c46a","border": "1.5px solid black"})
+
+print("Загальні втрати агресора в повітрі, воді та на землі по дням :\n")
+
+_, axs = plt.subplots(figsize=(20,8))
+plt.tight_layout(pad=4.0)
+
+sns.lineplot(x=air_data.index,y=air_data[["aircraft","helicopter","drone","mobileSRBMsystem"]].sum(axis=1),ax=axs,color=palette[6])
+sns.lineplot(x=water_data.index,y=water_data[["navalship","cruisemissiles"]].sum(axis=1),ax=axs,color=palette[1])
+sns.lineplot(x=field_data.index,y=field_data[["tank","APC","MRL","fieldartillery","anti-aircraftwarfare","vehiclesandfueltanks"]].sum(axis=1),ax=axs,color=palette[5])
+
+axs.set_title("\nWar Equipments Destruction\n",fontsize=25)
+axs.set_xlabel("\nДні",fontsize=20)
+axs.set_ylabel("",fontsize=20)
+axs.legend(["Повітряні сили", "Морські сили", "Піхота"],title="Category",edgecolor = "#1c1c1c")
+sns.despine(left=True, bottom=True)
+
+plt.show()
+
+#кореляційна мапа
+cmap_palette = ["#1E2328","#2A2E34","#3B3F46","#7C7C7C","#FED053","#FFC300","#F5B301","#F48C06","#E85D04","#DC2F02","#D00000","#9D0208","#8c0034","#900C3F","#7e002f","#680840","#600840","#580838","#480838"]
+cmap_palette = ["#1E2328","#2A2E34","#3B3F46","#7C7C7C","#FED053","#FFC300","#F5B301","#F48C06","#E85D04","#DC2F02","#D00000","#9D0208"]
+sns.palplot(sns.color_palette(cmap_palette))
+
+# plt.show()
+plt.subplots(figsize =(14, 12))
+
+war_data.drop(columns=["greatestlossesdirection"],inplace=True)
+war_data.info()
+
+sns.heatmap(war_data.drop(columns="day").corr(), cmap = cmap_palette, square=True, cbar_kws=dict(shrink =.95), 
+            annot=True, vmin=-1, vmax=1, linewidths=0.1,linecolor='white',annot_kws=dict(fontsize =12))
+plt.title("Кореляція ознак Пірсона\n", fontsize=25)
+plt.xticks(rotation=90)
+plt.show()
+
+
